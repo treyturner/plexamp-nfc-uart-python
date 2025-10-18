@@ -1,0 +1,23 @@
+[Unit]
+Description=Plexamp NFC Listener
+After=network.target
+
+[Service]
+# Run as your pi user (or whichever user owns the USB device)
+User=pi
+Group=pi
+
+# Use full paths to python and script
+WorkingDirectory=/home/pi/plexamp-nfc-uart-python
+ExecStart=/home/pi/plexamp-nfc-uart-python/venv/bin/python main.py
+
+# Ensure environment variables (optional, if you need)
+Environment="PYTHONUNBUFFERED=1"
+
+# Restart automatically if it crashes
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+

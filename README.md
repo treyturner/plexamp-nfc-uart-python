@@ -32,7 +32,7 @@ This script listens for NFC tags via a USB reader (like the **PN532**) and autom
 Clone this repo on your Plexamp device:
 
 ```bash
-git clone https://github.com/<yourusername>/plexamp-nfc-uart-python.git
+git clone https://github.com/spiercey/plexamp-nfc-uart-python.git
 cd plexamp-nfc-uart-python
 ```
 

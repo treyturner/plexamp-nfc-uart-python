@@ -20,7 +20,7 @@ This script listens for NFC tags via a USB reader (like the **PN532**) and autom
 
 - A Linux device for the NFC controller and a reachable Plexamp instance
 - A **PN532 NFC reader** connected via USB or UART
-  (uses `/dev/ttyUSB*`)
+  (uses `/dev/ttyUSB*` or `/dev/ttyACM*`)
 - Python 3.8 or newer
 - Internet access for package installation
 - The service assumes you are using the default `pi` user from raspberry pi install. If you are using a different user update the `plexamp-nfc.service` prior to install.
@@ -138,12 +138,12 @@ python main.py
 ## Troubleshooting
 
 ```
-| Issue                       | Possible Fix                                                                          |
-| --------------------------- | ------------------------------------------------------------------------------------- |
-| `Waiting for NFC reader...` | Check your PN532 connection. Run `ls /dev/ttyUSB*` to confirm the device appears.     |
+| Issue                       | Possible Fix                                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------------- |
+| `Waiting for NFC reader...` | Check your PN532 connection. Run `ls /dev/tty{USB,ACM}*` to confirm the device appears.     |
 | `Failed to trigger Plexamp` | Make sure Plexamp headless is running and reachable at the configured host on port `32500`. |
-| Service won’t start         | Check logs via `sudo journalctl -u plexamp-nfc.service -xe`.                          |
-| No tags detected            | Try different baud rate in `main.py` (`baudrate=115200` by default).                  |
+| Service won’t start         | Check logs via `sudo journalctl -u plexamp-nfc.service -xe`.                                |
+| No tags detected            | Try different baud rate in `main.py` (`baudrate=115200` by default).                        |
 
 ```
 

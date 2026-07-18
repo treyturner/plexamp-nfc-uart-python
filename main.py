@@ -5,6 +5,8 @@ import serial
 import requests
 from adafruit_pn532.uart import PN532_UART
 
+from plexamp import InvalidPlaybackURL, prepare_playback_url
+
 # ----------------------------
 # Helper: find PN532 serial device
 # ----------------------------
@@ -133,6 +135,11 @@ if __name__ == "__main__":
             # Convert to local Plexamp URL
             local_url = full_url.replace("https://listen.plex.tv", "http://localhost:32500")
             local_url = local_url.replace("http://listen.plex.tv", "http://localhost:32500")
+            try:
+                local_url = prepare_playback_url(local_url)
+            except InvalidPlaybackURL as e:
+                print(f"Invalid playback URL: {e}")
+                continue
             print(f"Local Plexamp URL: {local_url}")
 
             # If same URL as before and still within active session, skip
@@ -155,6 +162,5 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Reader error: {e}. Reconnecting...")
             pn532 = connect_reader()
-
 
 

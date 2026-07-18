@@ -8,7 +8,7 @@ This script listens for NFC tags via a USB reader (like the **PN532**) and autom
 
 ## 🚀 Features
 
-- Works with **headless Plexamp** instances (e.g. Raspberry Pi, Linux devices)
+- Works with local or remote Plexamp players exposing the Plex Companion API
 - Compatible with **PN532 UART/USB NFC readers**
 - Automatically reconnects if the reader is unplugged or unavailable
 - Detects and plays **tracks, albums, playlists, stations, or artists**
@@ -18,8 +18,8 @@ This script listens for NFC tags via a USB reader (like the **PN532**) and autom
 
 ## 🧰 Requirements
 
-- Linux device running **Plexamp headless**
-- A **PN532 NFC reader** connected via USB or UART  
+- A Linux device for the NFC controller and a reachable Plexamp instance
+- A **PN532 NFC reader** connected via USB or UART
   (uses `/dev/ttyUSB*`)
 - Python 3.8 or newer
 - Internet access for package installation
@@ -29,7 +29,7 @@ This script listens for NFC tags via a USB reader (like the **PN532**) and autom
 
 ## 📦 Installation
 
-Clone this repo on your Plexamp device:
+Clone this repo on the device connected to the NFC reader:
 
 ```bash
 git clone https://github.com/spiercey/plexamp-nfc-uart-python.git
@@ -61,10 +61,10 @@ The script searches for a PN532 device (/dev/ttyUSB*).
 
 When a tag is detected, it reads the NDEF URI data.
 
-The URI is parsed and converted into a local Plexamp URL
-(e.g. https://listen.plex.tv/... → http://localhost:32500/...)
+The URI is parsed and converted into the configured Plexamp URL
+(e.g. https://listen.plex.tv/... → http://localhost:32500/... by default).
 
-The local Plexamp endpoint is triggered via HTTP to start playback.
+The Plexamp endpoint is triggered via HTTP to start playback.
 
 Example log output:
 
@@ -76,6 +76,38 @@ Detected tag type: Playlist
 Local Plexamp URL: http://localhost:32500/playlists/123456
 Playback triggered! (Playlist)
 ```
+
+## Targeting a Remote Plexamp Player
+
+By default, the controller sends playback requests to `localhost:32500`. Set `PLEXAMP_HOST` when Plexamp runs on another device:
+
+```bash
+PLEXAMP_HOST=plexamp.example.com python main.py
+```
+
+Set the value to a hostname or IP address without a URL scheme or port. Plexamp's companion API port remains `32500`. For an IPv6 address, include the required URL brackets, such as `PLEXAMP_HOST=[fd00::10]`.
+
+For the systemd service, edit the service file:
+
+```bash
+sudo systemctl edit plexamp-nfc.service
+```
+
+Configure the variable as needed:
+
+```ini
+[Service]
+Environment="PLEXAMP_HOST=plexamp.example.com"
+```
+
+Then reload and restart the service:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart plexamp-nfc.service
+```
+
+The NFC controller must be able to reach TCP port `32500` on the Plexamp host.
 
 ## Monitoring & Logs
 
@@ -109,7 +141,7 @@ python main.py
 | Issue                       | Possible Fix                                                                          |
 | --------------------------- | ------------------------------------------------------------------------------------- |
 | `Waiting for NFC reader...` | Check your PN532 connection. Run `ls /dev/ttyUSB*` to confirm the device appears.     |
-| `Failed to trigger Plexamp` | Make sure Plexamp headless is running on the same host and listening on port `32500`. |
+| `Failed to trigger Plexamp` | Make sure Plexamp headless is running and reachable at the configured host on port `32500`. |
 | Service won’t start         | Check logs via `sudo journalctl -u plexamp-nfc.service -xe`.                          |
 | No tags detected            | Try different baud rate in `main.py` (`baudrate=115200` by default).                  |
 

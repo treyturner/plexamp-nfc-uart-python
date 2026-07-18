@@ -5,6 +5,10 @@ import serial
 import requests
 from adafruit_pn532.uart import PN532_UART
 
+
+PLEXAMP_HOST = os.getenv("PLEXAMP_HOST") or "localhost"
+PLEXAMP_BASE_URL = f"http://{PLEXAMP_HOST}:32500"
+
 # ----------------------------
 # Helper: find PN532 serial device
 # ----------------------------
@@ -130,9 +134,9 @@ if __name__ == "__main__":
 
             print(f"Detected tag type: {kind}")
 
-            # Convert to local Plexamp URL
-            local_url = full_url.replace("https://listen.plex.tv", "http://localhost:32500")
-            local_url = local_url.replace("http://listen.plex.tv", "http://localhost:32500")
+            # Convert to the configured Plexamp URL
+            local_url = full_url.replace("https://listen.plex.tv", PLEXAMP_BASE_URL)
+            local_url = local_url.replace("http://listen.plex.tv", PLEXAMP_BASE_URL)
             print(f"Local Plexamp URL: {local_url}")
 
             # If same URL as before and still within active session, skip

@@ -12,6 +12,7 @@ WorkingDirectory=/home/pi/plexamp-nfc-uart-python
 ExecStart=/home/pi/plexamp-nfc-uart-python/venv/bin/python main.py
 
 # Ensure environment variables (optional, if you need)
+Environment="PLEXAMP_HOST=localhost"
 Environment="PYTHONUNBUFFERED=1"
 
 # Restart automatically if it crashes

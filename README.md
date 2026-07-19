@@ -1,75 +1,174 @@
 # Plexamp NFC Controller 🎵
 
-A simple Python service that lets you trigger **Plexamp playback using NFC tags**.
+A Python command-line controller that reads Plexamp NFC tags through a PN532 reader and starts the linked album, playlist, track, station, or artist on a local or remote Plexamp player.
 
-This script listens for NFC tags via a USB reader (like the **PN532**) and automatically plays the linked item (album, playlist, track, etc.) on your **headless Plexamp** instance — perfect for setups like Raspberry Pi jukeboxes or DIY smart music stations.
+## Features
 
----
-
-## 🚀 Features
-
-- Works with local or remote Plexamp players exposing the Plex Companion API
-- Compatible with **PN532 UART/USB NFC readers**
-- Automatically reconnects if the reader is unplugged or unavailable
+- Runs on **Linux, Windows, and macOS**
+- Controls **local or remote** Plexamp players exposing the Plex Companion API
+- Supports standard **PN532 UART/USB** readers and **PN532Killer** via USB
+- **Automatically reconnects** when the reader is unplugged or unavailable
 - Detects and plays **tracks, albums, playlists, stations, or artists**
-- Runs as a **systemd service** for seamless startup and background operation
+- Includes optional **systemd** installation for Linux
 
----
+## Requirements
 
-## 🧰 Requirements
-
-- A Linux device for the NFC controller and a reachable Plexamp instance
-- A **PN532 NFC reader** connected via USB or UART
-  (uses `/dev/ttyUSB*` or `/dev/ttyACM*`)
 - Python 3.8 or newer
-- Internet access for package installation
-- The service assumes you are using the default `pi` user from raspberry pi install. If you are using a different user update the `plexamp-nfc.service` prior to install.
+- A PN532 reader connected through a serial port
+- A reachable Plexamp player with remote control enabled
+- Internet access while installing Python dependencies
 
----
+CI tests Python 3.8 and 3.14 on x64 Linux, Windows, and Intel macOS. Apple Silicon macOS is tested with Python 3.14 since older Python builds aren't available for current ARM runners.
 
-## 📦 Installation
+## Reader Selection
 
-Clone this repo on the device connected to the NFC reader:
+PN532Killer is automatically detected on every platform when its USB metadata is available.
 
-```bash
+Standard PN532 readers are automatically selected from `/dev/ttyUSB*` or `/dev/ttyACM*` on Linux. On Windows and macOS, set `PN532_PORT` explicitly so the controller does not probe unrelated serial devices.
+
+List available serial ports with:
+
+```text
+python -m serial.tools.list_ports -v
+```
+
+Typical port values are:
+
+- Windows: `COM3`
+- macOS: `/dev/cu.usbserial-110` or `/dev/cu.usbmodem1101`
+- Linux: `/dev/ttyUSB0` or `/dev/ttyACM0`
+
+An explicitly configured port always takes precedence over automatic detection. Setting `PN532_PORT` selects the device but does not force the PN532Killer protocol; Killer behavior still requires matching USB metadata.
+
+## Installation
+
+Clone the repository on the device connected to the NFC reader:
+
+```text
 git clone https://github.com/spiercey/plexamp-nfc-uart-python.git
 cd plexamp-nfc-uart-python
 ```
 
+### Linux command line
 
-Then run the installer:
+Create a virtual environment and run the controller directly:
 
+```text
+python3 -m venv .venv
+./.venv/bin/python -m pip install -r requirements.txt
+./.venv/bin/python main.py
 ```
+
+### Linux with systemd
+
+The installer targets Debian-based Linux systems and installs a systemd unit:
+
+```text
 chmod +x install.sh
 ./install.sh
 ```
 
+The included service assumes headless Plexamp defaults of a `pi` user and `/home/pi/plexamp-nfc-uart-python`. Update `plexamp-nfc.service` before running the installer if those values differ.
 
-This will:
+### macOS
 
-Install all Python dependencies in a virtual environment
+Create a virtual environment and install the dependencies:
 
-Set up and enable the plexamp-nfc.service systemd unit
+```text
+python3 -m venv .venv
+./.venv/bin/python -m pip install -r requirements.txt
+./.venv/bin/python -m serial.tools.list_ports -v
+```
 
-Start the NFC controller automatically
+Run a standard PN532 by specifying its port:
 
-Once complete, the service should already be running.
+```text
+PN532_PORT=/dev/cu.usbserial-110 ./.venv/bin/python main.py
+```
+
+For an automatically identified PN532Killer, omit `PN532_PORT`.
+
+### Windows PowerShell
+
+Create a virtual environment and install the dependencies:
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m serial.tools.list_ports -v
+```
+
+Run a standard PN532 by specifying its port:
+
+```powershell
+$env:PN532_PORT = "COM3"
+.\.venv\Scripts\python.exe main.py
+```
+
+For an automatically identified PN532Killer, leave `PN532_PORT` unset:
+
+```powershell
+Remove-Item Env:PN532_PORT -ErrorAction SilentlyContinue
+.\.venv\Scripts\python.exe main.py
+```
+
+Windows and macOS support is for command-line execution. Native services, LaunchAgents, scheduled tasks, packaged applications, and installers are not included.
+
+## Configuration
+
+| Variable       | Default             | Description                                                                                 |
+| -------------- | ------------------- | ------------------------------------------------------------------------------------------- |
+| `PN532_PORT`   | Automatic detection | Exact serial port for the reader. Required for standard PN532 readers on Windows and macOS. |
+| `PLEXAMP_HOST` | `localhost`         | Plexamp hostname or IP address without a URL scheme or port.                                |
+
+Plexamp's Companion API port remains `32500`. For an IPv6 address, include URL
+brackets, such as `PLEXAMP_HOST=[fd00::10]`.
+
+Example targeting a remote Plexamp player on macOS or Linux:
+
+```text
+PLEXAMP_HOST=plexamp.example.com ./.venv/bin/python main.py
+```
+
+Example targeting a remote player from Windows PowerShell:
+
+```powershell
+$env:PLEXAMP_HOST = "plexamp.example.com"
+.\.venv\Scripts\python.exe main.py
+```
+
+To configure the Linux systemd service, create an override:
+
+```text
+sudo systemctl edit plexamp-nfc.service
+```
+
+Add the settings that apply to the installation:
+
+```ini
+[Service]
+Environment="PN532_PORT=/dev/ttyUSB0"
+Environment="PLEXAMP_HOST=plexamp.example.com"
+```
+
+Then reload and restart the service:
+
+```text
+sudo systemctl daemon-reload
+sudo systemctl restart plexamp-nfc.service
+```
 
 ## How It Works
 
-The script searches for a PN532 device (/dev/ttyUSB*).
+1. The controller resolves the configured reader or automatically identifies a supported device.
+2. It reads the NDEF URI from a detected NFC tag.
+3. It converts the `listen.plex.tv` URL to the configured Plexamp endpoint.
+4. It sends the playback command and waits for Plexamp to create an active play queue.
 
-When a tag is detected, it reads the NDEF URI data.
+Example output:
 
-The URI is parsed and converted into the configured Plexamp URL
-(e.g. https://listen.plex.tv/... → http://localhost:32500/... by default).
-
-The Plexamp endpoint is triggered via HTTP to start playback.
-
-Example log output:
-
-```
-NFC reader connected on /dev/ttyUSB0
+```text
+NFC reader connected on COM3
 Tag detected! UID: 04a224bc59
 Parsed tag URL: https://listen.plex.tv/playlists/123456
 Detected tag type: Playlist
@@ -77,75 +176,42 @@ Local Plexamp URL: http://localhost:32500/playlists/123456
 Playback triggered! (Playlist)
 ```
 
-## Targeting a Remote Plexamp Player
-
-By default, the controller sends playback requests to `localhost:32500`. Set `PLEXAMP_HOST` when Plexamp runs on another device:
-
-```bash
-PLEXAMP_HOST=plexamp.example.com python main.py
-```
-
-Set the value to a hostname or IP address without a URL scheme or port. Plexamp's companion API port remains `32500`. For an IPv6 address, include the required URL brackets, such as `PLEXAMP_HOST=[fd00::10]`.
-
-For the systemd service, edit the service file:
-
-```bash
-sudo systemctl edit plexamp-nfc.service
-```
-
-Configure the variable as needed:
-
-```ini
-[Service]
-Environment="PLEXAMP_HOST=plexamp.example.com"
-```
-
-Then reload and restart the service:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl restart plexamp-nfc.service
-```
-
-The NFC controller must be able to reach TCP port `32500` on the Plexamp host.
-
-## Monitoring & Logs
+## Linux Service Management
 
 Check the running status:
 
-`systemctl status plexamp-nfc.service`
+```shell
+systemctl status plexamp-nfc.service
+```
 
 Follow live logs:
 
-`sudo journalctl -f -u plexamp-nfc.service`
+```shell
+sudo journalctl -f -u plexamp-nfc.service
+```
 
 Restart the service:
 
-`sudo systemctl restart plexamp-nfc.service`
+```shell
+sudo systemctl restart plexamp-nfc.service
+```
 
 Disable it on boot (optional):
 
-`sudo systemctl disable plexamp-nfc.service`
-
-## Manual Run (for debugging)
-
+```shell
+sudo systemctl disable plexamp-nfc.service
 ```
-source venv/bin/activate
-python main.py
-```
-
 
 ## Troubleshooting
 
-```
-| Issue                       | Possible Fix                                                                                |
-| --------------------------- | ------------------------------------------------------------------------------------------- |
-| `Waiting for NFC reader...` | Check your PN532 connection. Run `ls /dev/tty{USB,ACM}*` to confirm the device appears.     |
-| `Failed to trigger Plexamp` | Make sure Plexamp headless is running and reachable at the configured host on port `32500`. |
-| Service won’t start         | Check logs via `sudo journalctl -u plexamp-nfc.service -xe`.                                |
-| No tags detected            | Try different baud rate in `main.py` (`baudrate=115200` by default).                        |
-
-```
+| Issue                              | Possible fix                                                                                               |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `Waiting for NFC reader...`        | Run `python -m serial.tools.list_ports -v`; set `PN532_PORT` for an unidentified reader.                   |
+| Reader cannot be opened            | Confirm the port name, install the USB serial driver if required, and close other programs using the port. |
+| PN532Killer is treated as standard | Check that port enumeration reports VID/PID `1A86:55D3` or a `PN532Killer` product description.            |
+| `Failed to trigger Plexamp`        | Confirm Plexamp remote control is enabled and TCP port `32500` is reachable at `PLEXAMP_HOST`.             |
+| Linux service does not start       | Check `sudo journalctl -u plexamp-nfc.service -xe` and verify the service user and paths.                  |
+| No tags are detected               | Confirm the reader is configured for UART at 115200 baud and try another supported tag.                    |
 
 ## License & Credits
 

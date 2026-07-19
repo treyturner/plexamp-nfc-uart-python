@@ -1,7 +1,5 @@
 pyserial
-adafruit-pn532
 ndeflib
 requests
 adafruit-circuitpython-pn532
-RPi.GPIO; platform_machine == "armv7l" or platform_machine == "aarch64"
-
+RPi.GPIO; sys_platform == "linux" and (platform_machine == "armv7l" or platform_machine == "aarch64")

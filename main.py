@@ -1,6 +1,13 @@
-import time
 import os
+import sys
+import time
+from dataclasses import dataclass
+
 import serial
+
+if sys.platform in ("darwin", "win32"):
+    os.environ.setdefault("BLINKA_OS_AGNOSTIC", "1")
+
 from adafruit_pn532.uart import PN532_UART
 from plexamp import InvalidPlaybackURL, PlexampClient, prepare_playback_url
 from serial.tools import list_ports
@@ -9,6 +16,12 @@ from serial.tools import list_ports
 PLEXAMP_HOST = os.getenv("PLEXAMP_HOST") or "localhost"
 PLEXAMP_BASE_URL = f"http://{PLEXAMP_HOST}:32500"
 PN532KILLER_VID_PID = (0x1A86, 0x55D3)
+
+
+@dataclass(frozen=True)
+class _ReaderPort:
+    device: str
+    is_pn532killer: bool
 
 
 class PlexampPN532_UART(PN532_UART):
@@ -75,25 +88,44 @@ def is_pn532killer(port):
     )
 
 
+def _is_windows_com_port(device):
+    return device[:3].casefold() == "com" and device[3:].isdigit()
+
+
 # ----------------------------
 # Helper: find PN532 serial device
 # ----------------------------
 def find_uart_device():
-    ports = list(list_ports.comports())
+    ports = sorted(
+        list_ports.comports(),
+        key=lambda port: port.device.casefold(),
+    )
+    configured_device = (os.getenv("PN532_PORT") or "").strip()
+
+    if configured_device:
+        for port in ports:
+            same_windows_port = (
+                _is_windows_com_port(configured_device)
+                and _is_windows_com_port(port.device)
+                and configured_device.casefold() == port.device.casefold()
+            )
+            if port.device == configured_device or same_windows_port:
+                return _ReaderPort(port.device, is_pn532killer(port))
+
+        return _ReaderPort(configured_device, False)
 
     # Prefer readers that can be positively identified
     for port in ports:
         if is_pn532killer(port):
-            return port
+            return _ReaderPort(port.device, True)
 
     # Generic ttyACMs are only considered when no ttyUSBs exist
     for device_prefix in ("/dev/ttyUSB", "/dev/ttyACM"):
-        candidates = sorted(
-            (port for port in ports if port.device.startswith(device_prefix)),
-            key=lambda port: port.device,
-        )
+        candidates = [
+            port for port in ports if port.device.startswith(device_prefix)
+        ]
         if candidates:
-            return candidates[0]
+            return _ReaderPort(candidates[0].device, False)
 
     return None
 
@@ -123,6 +155,26 @@ def parse_ndef_uri(tag_data):
 # ----------------------------
 # NFC reader setup
 # ----------------------------
+def open_reader(port):
+    ser = serial.Serial(baudrate=115200, timeout=1)
+
+    if port.is_pn532killer:
+        # pySerial asserts DTR and RTS by default. Incorrect DTR/RTS
+        # handling on a PN532Killer disrupts its configuration.
+        ser.dtr = False
+        ser.rts = False
+
+    ser.port = port.device
+    ser.open()
+
+    reader_class = (
+        PN532Killer_UART if port.is_pn532killer else PlexampPN532_UART
+    )
+    pn532 = reader_class(ser, debug=False)
+    pn532.SAM_configuration()
+    return pn532
+
+
 def connect_reader():
     while True:
         port = find_uart_device()
@@ -131,28 +183,12 @@ def connect_reader():
             time.sleep(2)
             continue
 
-        device = port.device
         try:
-            ser = serial.Serial(baudrate=115200, timeout=1)
-
-            if is_pn532killer(port):
-                # pySerial asserts DTR and RTS by default. Incorrect DTR/RTS
-                # handling on a PN532Killer disrupts its configuration.
-                ser.dtr = False
-                ser.rts = False
-
-            ser.port = device
-            ser.open()
-
-            reader_class = (
-                PN532Killer_UART if is_pn532killer(port) else PlexampPN532_UART
-            )
-            pn532 = reader_class(ser, debug=False)
-            pn532.SAM_configuration()
-            print(f"NFC reader connected on {device}")
+            pn532 = open_reader(port)
+            print(f"NFC reader connected on {port.device}")
             return pn532
         except Exception as e:
-            print(f"Failed to connect to {device}: {e}")
+            print(f"Failed to connect to {port.device}: {e}")
             time.sleep(2)
 
 

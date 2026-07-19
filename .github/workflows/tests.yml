@@ -17,13 +17,33 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: ${{ matrix.name }} / Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version:
-          - "3.8"
-          - "3.14"
+        include:
+          - name: Ubuntu x64
+            os: ubuntu-latest
+            python-version: "3.8"
+          - name: Ubuntu x64
+            os: ubuntu-latest
+            python-version: "3.14"
+          - name: Windows x64
+            os: windows-latest
+            python-version: "3.8"
+          - name: Windows x64
+            os: windows-latest
+            python-version: "3.14"
+          - name: macOS Intel
+            os: macos-15-intel
+            python-version: "3.8"
+          - name: macOS Intel
+            os: macos-15-intel
+            python-version: "3.14"
+          - name: macOS Apple Silicon
+            os: macos-latest
+            python-version: "3.14"
 
     steps:
       - name: Check out repository
